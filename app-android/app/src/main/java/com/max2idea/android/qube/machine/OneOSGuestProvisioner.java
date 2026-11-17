@@ -42,7 +42,8 @@ public final class OneOSGuestProvisioner {
         machine.setBiosCode("Default");
         machine.setBiosVars(efiVarsPath);
 
-        machine.setVga("virtio-gpu-pci");
+        machine.setVga("virtio-gpu-gl-pci");
+        machine.setEnableVenus(0);
         machine.setRenderer(0);
         machine.setNetwork("User");
         machine.setNetworkCard("virtio-net-pci");
