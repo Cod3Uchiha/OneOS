@@ -10,7 +10,7 @@ OneOS runs as an ordinary Android application. It must not require root, invoke 
 2. QEMU ARM64 backend — QEMU 11.1.3 system emulation from QubeVM, using TCG by default.
 3. Guest disk — checksum-verified LineageOS 24 ARM64 QEMU guest package, extracted into app-private storage.
 4. Virtual devices — QEMU's emulated ARM virt board, virtio storage/network/input and user-mode networking.
-5. Host bridges — explicit, permission-gated APIs for display, audio, networking and selected sensors. Never assume camera, modem, GPU or vendor-driver passthrough.
+5. Host bridges — explicit, permission-gated APIs for display, audio, networking and selected sensors. Virgl may render guest 3D through Android EGL on the host GPU, but this is mediated rendering, not direct GPU passthrough. Never assume camera, modem, sensor or vendor-driver passthrough.
 
 ## S22 Ultra target
 
