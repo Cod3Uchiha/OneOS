@@ -27,19 +27,19 @@ public final class OneOSGuestProvisioner {
         machine.setCpu("max");
         machine.setEnableKVM(0);
         machine.setEnableMTTCG(1);
-        machine.setTcgBuffer(1024);
+        machine.setTcgBuffer(512);
 
         machine.setHdaImagePath(vdaPath);
         machine.setHdaInterface("virtio");
         machine.setHdbImagePath(vdbPath);
         machine.setHdbInterface("virtio");
 
-        File firmwareCode = new File(QubeApplication.getBasefileDir(), "roms/QUBE_ARM_EFI.fd");
+        File firmwareCode = new File(QubeApplication.getBasefileDir(), Config.UEFI_ARM_CODE);
         if (!firmwareCode.isFile()) {
             throw new IllegalStateException("QEMU ARM64 UEFI firmware is missing");
         }
         machine.setBiosType("UEFI");
-        machine.setBiosCode(firmwareCode.getAbsolutePath());
+        machine.setBiosCode("Default");
         machine.setBiosVars(efiVarsPath);
 
         machine.setVga("virtio-gpu-pci");
