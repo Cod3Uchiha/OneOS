@@ -2,7 +2,7 @@ plugins { id("com.android.application") }
 
 android {
     namespace = "com.cod3uchiha.oneos"
-    compileSdk = 37
+    compileSdk = 36
     ndkVersion = "30.0.16248370"
     defaultConfig {
         applicationId = "com.cod3uchiha.oneos"
