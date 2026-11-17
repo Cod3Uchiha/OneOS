@@ -23,6 +23,7 @@ The image is built for QEMU's ARM virt hardware with virtio devices; it is not S
     git clone --recurse-submodules https://github.com/Cod3Uchiha/OneOS.git
     cd OneOS
     sed -i -e 's/compileSdk = 37/compileSdk = 36/' -e 's/targetSdk = 37/targetSdk = 36/' vendor/QubeVM/qube-android-lib/build.gradle
+    grep -qxF 'virtio-net-pci' vendor/QubeVM/qube-android-lib/qemu-values/11.1.3/arm_nic_cards.txt || echo 'virtio-net-pci' >> vendor/QubeVM/qube-android-lib/qemu-values/11.1.3/arm_nic_cards.txt
     cd app-android
     ./gradlew assembleDebug
 
