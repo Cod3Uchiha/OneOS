@@ -85,7 +85,7 @@ public final class MainActivity extends Activity {
         launchButton.setAlpha(launchButton.isEnabled() ? 1f : 0.45f);
 
         section(page, "HARDWARE AND PERFORMANCE");
-        TextView note = text("The guest sees virtual ARM hardware, not the Snapdragon motherboard. TCG is software emulation and can be slower than native execution. The Adreno GPU, camera, modem, sensors and Samsung vendor drivers are not automatically passed through.", 13, 0xff8997a9);
+        TextView note = text("The guest sees virtual ARM hardware, not the Snapdragon motherboard. Virgl can render guest 3D through Android EGL on the Adreno GPU, but this is mediated graphics, not direct GPU passthrough. Camera, modem, sensors and Samsung vendor drivers are not passed through. TCG CPU emulation can still be slower than native execution.", 13, 0xff8997a9);
         note.setLineSpacing(dp(3), 1f);
         add(page, note, 10);
 
