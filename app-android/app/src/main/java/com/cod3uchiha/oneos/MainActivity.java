@@ -178,7 +178,6 @@ public final class MainActivity extends Activity {
 
                 deleteRecursively(installed);
                 if (!staging.renameTo(installed)) throw new IllegalStateException("Could not finalize the guest image");
-                FileInstaller.installFiles(this, false);
                 OneOSGuestProvisioner.configure(
                         new File(installed, "vda.qcow2").getAbsolutePath(),
                         new File(installed, "vdb.qcow2").getAbsolutePath(),
