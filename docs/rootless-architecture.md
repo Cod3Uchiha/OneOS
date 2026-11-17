@@ -8,7 +8,7 @@ OneOS runs as an ordinary Android application. It must not require root, invoke 
 
 1. Host app — UI, lifecycle, storage selection, logs and consent.
 2. QEMU ARM64 backend — QEMU 11.1.3 system emulation from QubeVM, using TCG by default.
-3. Guest disk — user-supplied disk image. Validate format, architecture, checksum and size before boot.
+3. Guest disk — checksum-verified LineageOS 24 ARM64 QEMU guest package, extracted into app-private storage.
 4. Virtual devices — QEMU's emulated ARM virt board, virtio storage/network/input and user-mode networking.
 5. Host bridges — explicit, permission-gated APIs for display, audio, networking and selected sensors. Never assume camera, modem, GPU or vendor-driver passthrough.
 
@@ -18,19 +18,19 @@ Initial target: Snapdragon SCG14 Galaxy S22 Ultra on Android 16. The app uses th
 
 TCG is compatible with ordinary app execution but is slower than hardware virtualization. Benchmark CPU load, thermals, memory pressure and sustained runtime on the exact SCG14 firmware before recommending long sessions.
 
-## Guest operating system requirements
+## Guest operating system
 
-QEMU ARM virt presents emulated hardware, not the Snapdragon board. A bootable Android guest must be built for that virtual board with a matching ARM64 kernel, initramfs, fstab, virtio drivers and Android system/vendor partitions. A stock Samsung firmware image, generic Android system.img, or emulator image built for Goldfish/Ranchu is not assumed to boot.
+OneOS can download and install the LineageOS 24 ARM64 QEMU VM archive published by jqssun/android-lineage-qemu. The guest image uses QEMU's ARM virt hardware and virtio devices. It is not Samsung firmware and does not use the host phone's board drivers.
 
-The current milestone integrates the VM engine and manager. A validated Android guest image is a separate milestone.
+The installer verifies the pinned archive SHA-256 before accepting the extracted virtual disks and UEFI variables. First boot, display, audio, networking and stability must still be tested on the exact SCG14 Android 16 firmware.
 
 ## Milestones
 
 - [x] Remove the old root/system-switching implementation.
 - [x] Create a rootless host app and app-managed VM workspace.
 - [x] Integrate QEMU ARM64 system emulation with TCG as the default backend.
-- [ ] Build and validate a bootable ARM64 Linux test guest on SCG14.
-- [ ] Build a compatible Android guest kernel, ramdisk and system/vendor image.
-- [ ] Validate Android guest boot and basic input/display/audio.
+- [x] Add checksum-verified Android 16 guest archive installation and VM profile provisioning.
+- [ ] Validate Android guest first boot on SCG14.
+- [ ] Validate display, input, audio and user-mode networking.
 - [ ] Implement pause/resume, lifecycle recovery and resource limits.
-- [ ] Add tested host bridges and benchmark performance.
+- [ ] Benchmark thermals and sustained performance.

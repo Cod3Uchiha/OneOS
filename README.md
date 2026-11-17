@@ -6,8 +6,8 @@ OneOS is a **rootless ARM64 virtual-machine app** for running a second operating
 
 - QEMU 11.1.3 ARM64 system-emulation backend integrated from [QubeVM](https://github.com/rhn-1k/QubeVM).
 - TCG software acceleration is selected by default; no root or /dev/kvm access is required.
-- The app opens an ARM64 VM manager for creating and configuring virtual machines.
-- A bootable Android guest image is **not yet included or validated**. Android needs a kernel, ramdisk and system/vendor images built for QEMU's ARM virt machine; a random phone firmware or generic system.img will not work.
+- OneOS includes a checksum-verified installer for the LineageOS 24 ARM64 QEMU guest image (Android 16).
+- The guest image is downloaded separately from its upstream release and is not bundled in the APK. First boot and performance still need validation on the target SCG14.
 
 Initial device target: Samsung Galaxy S22 Ultra SCG14 (Snapdragon 8 Gen 1, Android 16). The VM uses emulated virtual hardware. It does not automatically receive the host's Adreno GPU, camera, modem, sensors or Samsung vendor drivers.
 
