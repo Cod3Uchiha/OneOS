@@ -1,8 +1,12 @@
 name: Android build
 
+concurrency:
+  group: oneos-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
-    branches: [rootless-vm-rebuild]
+    branches: [main, qemu-arm64-engine]
   pull_request:
     branches: [main]
 
@@ -11,15 +15,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK and NDK
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;30.0.16248370"
+      - name: Align QubeVM library compile SDK with Android 16 SDK
+        run: |
+          sed -i -e 's/compileSdk = 37/compileSdk = 36/' -e 's/targetSdk = 37/targetSdk = 36/' vendor/QubeVM/qube-android-lib/build.gradle
+          grep -qxF 'virtio-net-pci' vendor/QubeVM/qube-android-lib/qemu-values/11.1.3/arm_nic_cards.txt || echo 'virtio-net-pci' >> vendor/QubeVM/qube-android-lib/qemu-values/11.1.3/arm_nic_cards.txt
+      - name: Fetch verified QEMU ARM64 runtime
+        run: |
+          curl --fail --location --retry 3 \
+            https://github.com/rhn-1k/QubeVM/releases/download/7.1.5/qube-arm-q11.1.3-android-arm64-v8a-release.apk \
+            --output /tmp/qube-arm.apk
+          echo "ecb2e6ac3025a2a40572bd49a16c48df6d479eb4f092caec199df58328af7ae2  /tmp/qube-arm.apk" | sha256sum --check -
+          mkdir -p app-android/app/src/main/jniLibs/arm64-v8a app-android/app/src/main/assets/licenses
+          cp vendor/QubeVM/COPYING app-android/app/src/main/assets/licenses/QubeVM-GPL-3.0.txt
+          unzip -j -o /tmp/qube-arm.apk 'lib/arm64-v8a/*.so' -d app-android/app/src/main/jniLibs/arm64-v8a
+          test -s app-android/app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so
+          test -s app-android/app/src/main/jniLibs/arm64-v8a/libqube.so
       - name: Build debug APK
         working-directory: app-android
         run: ./gradlew --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: oneos-rootless-debug
+          name: oneos-qemu-arm64-debug
           path: app-android/app/build/outputs/apk/debug/app-debug.apk
