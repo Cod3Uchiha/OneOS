@@ -29,7 +29,7 @@ The image is built for QEMU's ARM virt hardware with virtio devices; it is not S
 
 The GitHub Actions workflow performs the QubeVM SDK compatibility patch and native library extraction automatically.
 
-Initial target: Samsung Galaxy S22 Ultra SCG14, Snapdragon 8 Gen 1, Android 16. TCG is software emulation and may be slow under sustained guest CPU load. It does not pass through the phone's Adreno GPU, camera, modem, sensors or Samsung vendor drivers.
+Initial target: Samsung Galaxy S22 Ultra SCG14, Snapdragon 8 Gen 1, Android 16. TCG CPU execution is software emulation and may be slow under sustained load. Virgl graphics uses Android's system EGL to render guest 3D on the Adreno GPU; it is not direct GPU passthrough. Camera, modem, sensors and Samsung vendor drivers are not exposed to the guest.
 
 ## Licensing
 
