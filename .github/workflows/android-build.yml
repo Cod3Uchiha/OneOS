@@ -17,9 +17,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
       - name: Install Android SDK and NDK
-        run: sdkmanager "platforms;android-37" "build-tools;37.0.0" "ndk;30.0.16248370"
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platforms;android-37" "build-tools;37.0.0" "ndk;30.0.16248370"
       - name: Fetch verified QEMU ARM64 runtime
         run: |
           curl --fail --location --retry 3 \
