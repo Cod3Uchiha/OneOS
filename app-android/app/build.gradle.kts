@@ -29,4 +29,5 @@ android {
 
 dependencies {
     implementation(project(":qube-android-lib"))
+    implementation("androidx.appcompat:appcompat:1.7.1")
 }
