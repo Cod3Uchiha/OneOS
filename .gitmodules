@@ -1,0 +1,3 @@
+[submodule "vendor/QubeVM"]
+	path = vendor/QubeVM
+	url = https://github.com/rhn-1k/QubeVM.git
