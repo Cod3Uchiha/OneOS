@@ -23,7 +23,10 @@ jobs:
       - name: Install Android SDK and NDK
         run: |
           yes | sdkmanager --licenses
-          sdkmanager "platforms;android-37" "build-tools;37.0.0" "ndk;30.0.16248370"
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;30.0.16248370"
+      - name: Align QubeVM library compile SDK with Android 16 SDK
+        run: |
+          sed -i -e 's/compileSdk = 37/compileSdk = 36/' -e 's/targetSdk = 37/targetSdk = 36/' vendor/QubeVM/qube-android-lib/build.gradle
       - name: Fetch verified QEMU ARM64 runtime
         run: |
           curl --fail --location --retry 3 \
