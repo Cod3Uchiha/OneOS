@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ExTV/Podroid
-          ref: main
+          ref: e3fc1befa3c135d28bf8d40e3c2264d93fea87ef
           path: .qemu-builder
 
       - name: Build upstream QEMU for Android ARM64
