@@ -54,11 +54,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y qemu-efi-aarch64
-          firmware="$(find /usr/share -type f \\( -iname 'AAVMF_CODE.fd' -o -iname 'QEMU_EFI.fd' \\) -print -quit)"
-          test -n "$firmware"
+          firmware_code="$(find /usr/share -type f \\( -iname 'AAVMF_CODE.fd' -o -iname 'QEMU_EFI.fd' \\) -print -quit)"
+          firmware_vars="$(find /usr/share -type f \\( -iname 'AAVMF_VARS.fd' -o -iname 'QEMU_VARS.fd' \\) -print -quit)"
+          test -n "$firmware_code"
+          test -n "$firmware_vars"
           mkdir -p app-android/app/src/main/assets/firmware
-          cp "$firmware" app-android/app/src/main/assets/firmware/UEFI_CODE.fd
+          cp "$firmware_code" app-android/app/src/main/assets/firmware/UEFI_CODE.fd
+          cp "$firmware_vars" app-android/app/src/main/assets/firmware/UEFI_VARS.fd
           test -s app-android/app/src/main/assets/firmware/UEFI_CODE.fd
+          test -s app-android/app/src/main/assets/firmware/UEFI_VARS.fd
 
       - name: Package noVNC display client
         run: |
