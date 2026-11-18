@@ -2,6 +2,8 @@ package com.cod3uchiha.oneos;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.Button;
@@ -128,6 +130,7 @@ public final class OneOSVmActivity extends Activity {
             qemu = builder.start();
             OneOSLog.info("QEMU_START", "Standalone QEMU launched. pid=" + qemu.pid() + "; storageGb=" + storageGb + "; command=" + args);
             setStatus("Starting guest OS…");
+            new Handler(Looper.getMainLooper()).postDelayed(() -> { if (display != null) display.reload(); }, 1800);
             final Process launched = qemu;
             new Thread(() -> {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(launched.getInputStream()))) {
