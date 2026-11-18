@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -24,7 +22,7 @@ import java.util.List;
 public final class OneOSVmActivity extends Activity {
     private Process qemu;
     private TextView status;
-    private WebView display;
+    private NativeGuestDisplay display;
     private int storageGb = 30;
 
     @Override protected void onCreate(Bundle state) {
@@ -40,14 +38,7 @@ public final class OneOSVmActivity extends Activity {
         status.setText("OneOS is stopped · virtual storage " + storageGb + " GB");
         status.setPadding(dp(16), dp(12), dp(16), dp(12));
         root.addView(status, new LinearLayout.LayoutParams(-1, -2));
-        display = new WebView(this);
-        WebSettings settings = display.getSettings();
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        settings.setAllowFileAccess(true);
-        settings.setAllowContentAccess(false);
-        settings.setAllowUniversalAccessFromFileURLs(true);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        display = new NativeGuestDisplay(this);
         root.addView(display, new LinearLayout.LayoutParams(-1, 0, 1f));
         LinearLayout actions = new LinearLayout(this);
         actions.setPadding(dp(12), dp(8), dp(12), dp(8));
@@ -63,7 +54,7 @@ public final class OneOSVmActivity extends Activity {
         actions.addView(stop, new LinearLayout.LayoutParams(0, dp(52), 1f));
         root.addView(actions);
         setContentView(root);
-        display.loadUrl("file:///android_asset/novnc/vnc.html?host=127.0.0.1&port=5700&autoconnect=true&resize=scale");
+        
     }
 
     private void startGuest() {
@@ -119,11 +110,12 @@ public final class OneOSVmActivity extends Activity {
             }
             add(args, "-device", "virtio-gpu-pci");
             add(args, "-device", "virtio-keyboard-pci");
-            add(args, "-device", "virtio-mouse-pci");
+            add(args, "-device", "virtio-tablet-pci");
             add(args, "-device", "virtio-rng-pci");
             add(args, "-netdev", "user,id=net0");
             add(args, "-device", "virtio-net-pci,netdev=net0");
-            add(args, "-display", "vnc=127.0.0.1:0,websocket=5700");
+            add(args, "-display", "none");
+            add(args, "-qmp", "unix:" + new File(guest, "qmp.sock").getAbsolutePath() + ",server=on,wait=off");
             add(args, "-serial", "file:" + new File(guest, "serial.log").getAbsolutePath());
             add(args, "-monitor", "none");
             args.add("-no-reboot");
@@ -135,7 +127,7 @@ public final class OneOSVmActivity extends Activity {
             qemu = builder.start();
             OneOSLog.info("QEMU_START", "Standalone QEMU launched; storageGb=" + storageGb + "; command=" + args);
             setStatus("Starting guest OS…");
-            new Handler(Looper.getMainLooper()).postDelayed(() -> { if (display != null) display.reload(); }, 1800);
+            display.start(new File(guest, "qmp.sock"));
             final Process launched = qemu;
             new Thread(() -> {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(launched.getInputStream()))) {
@@ -212,7 +204,7 @@ public final class OneOSVmActivity extends Activity {
 
     @Override protected void onDestroy() {
         stopGuest();
-        if (display != null) display.destroy();
+        if (display != null) display.stop();
         super.onDestroy();
     }
 }
