@@ -63,7 +63,7 @@ public final class MainActivity extends Activity {
                 "Android " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")\nHost ABI: " + Build.SUPPORTED_ABIS[0]);
 
         section(page, "VIRTUAL MACHINE");
-        card(page, "QEMU 11.1.3 · ARM64",
+        card(page, "QEMU 11.1.2 · ARM64",
                 "Rootless QEMU system emulation using multi-threaded TCG. KVM is disabled; no root access or host partition changes are used.");
 
         section(page, "ANDROID 16 GUEST");
@@ -85,7 +85,7 @@ public final class MainActivity extends Activity {
         logs.setOnClickListener(v -> showInstallLogs());
         add(page, logs, 8);
 
-        launchButton = button("Open OneOS VM manager");
+        launchButton = button("Start OneOS");
         launchButton.setOnClickListener(v -> startActivity(new Intent(this, OneOSVmActivity.class)));
         add(page, launchButton, 16);
         launchButton.setEnabled(hasInstalledGuest());
