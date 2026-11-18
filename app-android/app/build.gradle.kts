@@ -8,8 +8,8 @@ android {
         applicationId = "com.cod3uchiha.oneos"
         minSdk = 30
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0-qemu"
+        versionCode = 3
+        versionName = "0.3.0-standalone"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     compileOptions {
@@ -18,16 +18,11 @@ android {
     }
     sourceSets {
         getByName("main") {
-            java.srcDir("../../vendor/QubeVM/qube-android-arm/src/main/java")
-            res.srcDir("../../vendor/QubeVM/qube-android-arm/src/main/res")
-            assets.srcDir("../../vendor/QubeVM/qube-android-arm/src/main/assets")
             jniLibs.srcDir("src/main/jniLibs")
         }
     }
+    packaging {
+        jniLibs { useLegacyPackaging = true }
+    }
     buildTypes { release { isMinifyEnabled = false } }
-}
-
-dependencies {
-    implementation(project(":qube-android-lib"))
-    implementation("androidx.appcompat:appcompat:1.7.1")
 }

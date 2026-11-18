@@ -1,0 +1,62 @@
+name: Build standalone Android ARM64 QEMU
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/standalone-qemu-android]
+    paths:
+      - .github/workflows/standalone-qemu.yml
+
+permissions:
+  contents: read
+
+jobs:
+  qemu-android-arm64:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout OneOS
+        uses: actions/checkout@v4
+
+      - name: Checkout Android QEMU build recipe
+        uses: actions/checkout@v4
+        with:
+          repository: ExTV/Podroid
+          ref: e3fc1befa3c135d28bf8d40e3c2264d93fea87ef
+          path: .qemu-builder
+
+      - name: Build upstream QEMU for Android ARM64
+        run: |
+          docker build \
+            --file .qemu-builder/Dockerfile \
+            --target qemu-builder \
+            --build-arg QEMU_VERSION=11.1.2 \
+            --tag oneos-qemu-android-builder \
+            .qemu-builder
+
+      - name: Extract and validate Android runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p runtime/arm64-v8a
+          cid="$(docker create oneos-qemu-android-builder)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid:/opt/qemu-out/libqemu-system-aarch64.so" runtime/arm64-v8a/libqemu-system-aarch64.so
+          docker cp "$cid:/opt/qemu-out/libslirp.so" runtime/arm64-v8a/libslirp.so
+          docker cp "$cid:/opt/qemu-out/bin/qemu-img" runtime/arm64-v8a/qemu-img
+          file runtime/arm64-v8a/*
+          readelf -h runtime/arm64-v8a/libqemu-system-aarch64.so | grep -E 'Class:|Machine:'
+          readelf -h runtime/arm64-v8a/libslirp.so | grep -E 'Class:|Machine:'
+          readelf -h runtime/arm64-v8a/qemu-img | grep -E 'Class:|Machine:'
+          readelf -h runtime/arm64-v8a/libqemu-system-aarch64.so | grep -q 'AArch64'
+          readelf -h runtime/arm64-v8a/libslirp.so | grep -q 'AArch64'
+          readelf -h runtime/arm64-v8a/qemu-img | grep -q 'AArch64'
+          chmod 755 runtime/arm64-v8a/qemu-img
+          printf 'QEMU source: QEMU 11.1.2\nAndroid ABI: arm64-v8a\nBuild recipe: ExTV/Podroid Dockerfile qemu-builder stage\n' > runtime/BUILD-INFO.txt
+
+      - name: Upload standalone QEMU runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: oneos-standalone-qemu-android-arm64
+          path: runtime/
+          if-no-files-found: error
+          retention-days: 30

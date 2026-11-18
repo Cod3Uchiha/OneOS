@@ -6,47 +6,84 @@ concurrency:
 
 on:
   push:
-    branches: [main, qemu-arm64-engine]
+    branches: [main, qemu-arm64-engine, feat/standalone-qemu-android]
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   debug-apk:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout OneOS
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned Android QEMU build recipe
+        uses: actions/checkout@v4
         with:
-          submodules: recursive
+          repository: ExTV/Podroid
+          ref: e3fc1befa3c135d28bf8d40e3c2264d93fea87ef
+          path: .qemu-builder
+
+      - name: Build upstream QEMU for Android ARM64
+        run: |
+          docker build \
+            --file .qemu-builder/Dockerfile \
+            --target qemu-builder \
+            --build-arg QEMU_VERSION=11.1.2 \
+            --tag oneos-qemu-android-builder \
+            .qemu-builder
+
+      - name: Package QEMU runtime
+        run: |
+          set -euo pipefail
+          mkdir -p app-android/app/src/main/jniLibs/arm64-v8a app-android/app/src/main/assets/bin
+          cid="$(docker create oneos-qemu-android-builder)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid:/opt/qemu-out/libqemu-system-aarch64.so" app-android/app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so
+          docker cp "$cid:/opt/qemu-out/libslirp.so" app-android/app/src/main/jniLibs/arm64-v8a/libslirp.so
+          docker cp "$cid:/opt/qemu-out/bin/qemu-img" app-android/app/src/main/assets/bin/qemu-img
+          chmod 755 app-android/app/src/main/assets/bin/qemu-img
+          readelf -h app-android/app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so | grep -q AArch64
+          readelf -h app-android/app/src/main/jniLibs/arm64-v8a/libslirp.so | grep -q AArch64
+          readelf -h app-android/app/src/main/assets/bin/qemu-img | grep -q AArch64
+
+      - name: Install ARM64 UEFI firmware
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-efi-aarch64
+          firmware_code="$(find /usr/share -type f \( -iname 'AAVMF_CODE.fd' -o -iname 'QEMU_EFI.fd' \) -print -quit)"
+          firmware_vars="$(find /usr/share -type f \( -iname 'AAVMF_VARS.fd' -o -iname 'QEMU_VARS.fd' \) -print -quit)"
+          test -n "$firmware_code"
+          test -n "$firmware_vars"
+          mkdir -p app-android/app/src/main/assets/firmware
+          cp "$firmware_code" app-android/app/src/main/assets/firmware/UEFI_CODE.fd
+          cp "$firmware_vars" app-android/app/src/main/assets/firmware/UEFI_VARS.fd
+          test -s app-android/app/src/main/assets/firmware/UEFI_CODE.fd
+          test -s app-android/app/src/main/assets/firmware/UEFI_VARS.fd
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
+
       - name: Install Android SDK and NDK
         run: |
           yes | sdkmanager --licenses
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;30.0.16248370"
-      - name: Align QubeVM library compile SDK with Android 16 SDK
-        run: |
-          sed -i -e 's/compileSdk = 37/compileSdk = 36/' -e 's/targetSdk = 37/targetSdk = 36/' vendor/QubeVM/qube-android-lib/build.gradle
-          grep -qxF 'virtio-net-pci' vendor/QubeVM/qube-android-lib/qemu-values/11.1.3/arm_nic_cards.txt || echo 'virtio-net-pci' >> vendor/QubeVM/qube-android-lib/qemu-values/11.1.3/arm_nic_cards.txt
-      - name: Fetch verified QEMU ARM64 runtime
-        run: |
-          curl --fail --location --retry 3 \
-            https://github.com/rhn-1k/QubeVM/releases/download/7.1.5/qube-arm-q11.1.3-android-arm64-v8a-release.apk \
-            --output /tmp/qube-arm.apk
-          echo "ecb2e6ac3025a2a40572bd49a16c48df6d479eb4f092caec199df58328af7ae2  /tmp/qube-arm.apk" | sha256sum --check -
-          mkdir -p app-android/app/src/main/jniLibs/arm64-v8a app-android/app/src/main/assets/licenses
-          cp vendor/QubeVM/COPYING app-android/app/src/main/assets/licenses/QubeVM-GPL-3.0.txt
-          unzip -j -o /tmp/qube-arm.apk 'lib/arm64-v8a/*.so' -d app-android/app/src/main/jniLibs/arm64-v8a
-          test -s app-android/app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so
-          test -s app-android/app/src/main/jniLibs/arm64-v8a/libqube.so
+
       - name: Build debug APK
         working-directory: app-android
         run: ./gradlew --no-daemon assembleDebug
+
       - uses: actions/upload-artifact@v4
         with:
-          name: oneos-qemu-arm64-debug
+          name: oneos-standalone-qemu-arm64-debug
           path: app-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
