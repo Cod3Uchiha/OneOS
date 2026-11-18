@@ -8,6 +8,8 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -16,14 +18,16 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
-/** OneOS-owned QEMU launcher. No VM framework or root access is used. */
+/** OneOS-owned standalone QEMU launcher. */
 public final class OneOSVmActivity extends Activity {
     private Process qemu;
     private TextView status;
     private WebView display;
+    private int storageGb = 30;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        storageGb = Math.max(8, getIntent().getIntExtra("storage_gb", 30));
         getWindow().setStatusBarColor(0xff10141b);
         getWindow().setNavigationBarColor(0xff10141b);
         LinearLayout root = new LinearLayout(this);
@@ -31,7 +35,7 @@ public final class OneOSVmActivity extends Activity {
         root.setBackgroundColor(0xff10141b);
         status = new TextView(this);
         status.setTextColor(0xffd8e2ef);
-        status.setText("OneOS is stopped.");
+        status.setText("OneOS is stopped · virtual storage " + storageGb + " GB");
         status.setPadding(dp(16), dp(12), dp(16), dp(12));
         root.addView(status, new LinearLayout.LayoutParams(-1, -2));
         display = new WebView(this);
@@ -40,6 +44,7 @@ public final class OneOSVmActivity extends Activity {
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(false);
+        settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         root.addView(display, new LinearLayout.LayoutParams(-1, 0, 1f));
         LinearLayout actions = new LinearLayout(this);
@@ -57,23 +62,35 @@ public final class OneOSVmActivity extends Activity {
         root.addView(actions);
         setContentView(root);
         display.loadUrl("file:///android_asset/novnc/vnc.html?host=127.0.0.1&port=5700&autoconnect=true&resize=scale");
-        if (!guestDirectory().isDirectory()) setStatus("No installed OS image. Import an OS image from OneOS home.");
     }
 
     private void startGuest() {
         if (qemu != null && qemu.isAlive()) { setStatus("OneOS is already running."); return; }
         try {
-            File guest = guestDirectory();
-            File vda = new File(guest, "vda.qcow2");
-            File vdb = new File(guest, "vdb.qcow2");
-            File vars = new File(guest, "efi_vars.fd");
+            File guest = new File(getFilesDir(), "guest");
+            File iso = new File(guest, "installer.iso");
+            File osQcow = new File(guest, "os.qcow2");
+            File osImg = new File(guest, "os.img");
+            File osRaw = new File(guest, "os.raw");
+            File osDisk = iso.isFile() ? new File(guest, "system.qcow2")
+                    : osQcow.isFile() ? osQcow : osImg.isFile() ? osImg : osRaw;
+            if (!iso.isFile() && !osDisk.isFile()) throw new IllegalStateException("No supported OS image is installed.");
             File firmware = new File(getFilesDir(), "firmware/UEFI_CODE.fd");
+            File vars = new File(guest, "efi_vars.fd");
+            File qemuImg = new File(getFilesDir(), "bin/qemu-img");
             File executable = new File(getApplicationInfo().nativeLibraryDir, "libqemu-system-aarch64.so");
             File slirp = new File(getApplicationInfo().nativeLibraryDir, "libslirp.so");
             if (!executable.isFile() || !executable.canExecute()) throw new IllegalStateException("Standalone Android QEMU runtime is missing or not executable.");
             if (!slirp.isFile()) throw new IllegalStateException("QEMU networking library is missing.");
             if (!firmware.isFile()) copyAsset("firmware/UEFI_CODE.fd", firmware);
-            if (!vda.isFile() || !vdb.isFile() || !vars.isFile()) throw new IllegalStateException("Guest disks or UEFI variables are missing. Import the OS image again.");
+            if (!vars.isFile()) copyAsset("firmware/UEFI_VARS.fd", vars);
+            if (!qemuImg.isFile()) copyAsset("bin/qemu-img", qemuImg);
+            if (!qemuImg.setExecutable(true, true) && !qemuImg.canExecute()) throw new IllegalStateException("Could not prepare qemu-img.");
+
+            ensureVirtualDisk(qemuImg, osDisk, storageGb);
+            File dataDisk = new File(guest, "data.qcow2");
+            if (!osDisk.equals(dataDisk)) ensureVirtualDisk(qemuImg, dataDisk, storageGb);
+
             List<String> args = new ArrayList<>();
             args.add(executable.getAbsolutePath());
             add(args, "-name", "OneOS");
@@ -84,10 +101,20 @@ public final class OneOSVmActivity extends Activity {
             add(args, "-m", "4096");
             add(args, "-drive", "if=pflash,format=raw,unit=0,readonly=on,file=" + firmware.getAbsolutePath());
             add(args, "-drive", "if=pflash,format=raw,unit=1,file=" + vars.getAbsolutePath());
-            add(args, "-drive", "if=none,id=osdisk,file=" + vda.getAbsolutePath() + ",format=qcow2,cache=writeback");
+            add(args, "-drive", "if=none,id=osdisk,file=" + osDisk.getAbsolutePath() + ",format=" + (osDisk.getName().endsWith(".img") || osDisk.getName().endsWith(".raw") ? "raw" : "qcow2"));
             add(args, "-device", "virtio-blk-pci,drive=osdisk");
-            add(args, "-drive", "if=none,id=auxdisk,file=" + vdb.getAbsolutePath() + ",format=qcow2,cache=writeback");
-            add(args, "-device", "virtio-blk-pci,drive=auxdisk");
+            if (!iso.isFile()) {
+                add(args, "-drive", "if=none,id=datadisk,file=" + dataDisk.getAbsolutePath() + ",format=qcow2");
+                add(args, "-device", "virtio-blk-pci,drive=datadisk");
+            } else {
+                add(args, "-drive", "file=" + iso.getAbsolutePath() + ",media=cdrom,readonly=on");
+                add(args, "-boot", "order=d");
+            }
+            File aux = new File(guest, "aux.qcow2");
+            if (aux.isFile()) {
+                add(args, "-drive", "if=none,id=auxdisk,file=" + aux.getAbsolutePath() + ",format=qcow2");
+                add(args, "-device", "virtio-blk-pci,drive=auxdisk");
+            }
             add(args, "-device", "virtio-gpu-pci");
             add(args, "-device", "virtio-keyboard-pci");
             add(args, "-device", "virtio-mouse-pci");
@@ -98,12 +125,13 @@ public final class OneOSVmActivity extends Activity {
             add(args, "-serial", "file:" + new File(guest, "serial.log").getAbsolutePath());
             add(args, "-monitor", "none");
             add(args, "-no-reboot");
+
             ProcessBuilder builder = new ProcessBuilder(args);
             builder.directory(guest);
             builder.environment().put("LD_LIBRARY_PATH", getApplicationInfo().nativeLibraryDir + ":" + getFilesDir().getAbsolutePath());
             builder.redirectErrorStream(true);
             qemu = builder.start();
-            OneOSLog.info("QEMU_START", "Standalone QEMU launched. pid=" + qemu.pid() + "; command=" + args);
+            OneOSLog.info("QEMU_START", "Standalone QEMU launched. pid=" + qemu.pid() + "; storageGb=" + storageGb + "; command=" + args);
             setStatus("Starting guest OS…");
             final Process launched = qemu;
             new Thread(() -> {
@@ -126,6 +154,37 @@ public final class OneOSVmActivity extends Activity {
         }
     }
 
+    private void ensureVirtualDisk(File qemuImg, File disk, int sizeGb) throws Exception {
+        if (!disk.isFile()) {
+            runTool(qemuImg, "create", "-f", "qcow2", disk.getAbsolutePath(), sizeGb + "G");
+            return;
+        }
+        String info = runTool(qemuImg, "info", "--output=json", disk.getAbsolutePath());
+        long virtualSize = new JSONObject(info).optLong("virtual-size", 0L);
+        long requested = sizeGb * 1024L * 1024L * 1024L;
+        if (virtualSize > 0 && virtualSize < requested) {
+            runTool(qemuImg, "resize", disk.getAbsolutePath(), sizeGb + "G");
+        }
+    }
+
+    private String runTool(File executable, String... arguments) throws Exception {
+        List<String> command = new ArrayList<>();
+        command.add(executable.getAbsolutePath());
+        for (String argument : arguments) command.add(argument);
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.environment().put("LD_LIBRARY_PATH", getApplicationInfo().nativeLibraryDir + ":" + getFilesDir().getAbsolutePath());
+        builder.redirectErrorStream(true);
+        Process process = builder.start();
+        StringBuilder output = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) output.append(line).append('\n');
+        }
+        int code = process.waitFor();
+        if (code != 0) throw new IllegalStateException("qemu-img failed (" + code + "): " + output);
+        return output.toString();
+    }
+
     private void stopGuest() {
         Process running = qemu;
         if (running == null || !running.isAlive()) { setStatus("OneOS is already stopped."); return; }
@@ -133,10 +192,9 @@ public final class OneOSVmActivity extends Activity {
         setStatus("Stopping guest OS…");
     }
 
-    private File guestDirectory() { return new File(getFilesDir(), "guest/android16"); }
     private void copyAsset(String asset, File target) throws Exception {
         File parent = target.getParentFile();
-        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) throw new IllegalStateException("Cannot create firmware directory.");
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) throw new IllegalStateException("Cannot create " + parent);
         try (InputStream in = getAssets().open(asset); FileOutputStream out = new FileOutputStream(target)) {
             byte[] buffer = new byte[65536];
             int n;
@@ -144,9 +202,11 @@ public final class OneOSVmActivity extends Activity {
             out.getFD().sync();
         }
     }
+
     private static void add(List<String> args, String key, String value) { args.add(key); args.add(value); }
     private void setStatus(String message) { runOnUiThread(() -> status.setText(message)); }
     private int dp(int value) { return (int) (value * getResources().getDisplayMetrics().density + 0.5f); }
+
     @Override protected void onDestroy() {
         stopGuest();
         if (display != null) display.destroy();
