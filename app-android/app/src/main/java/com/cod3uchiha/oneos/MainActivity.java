@@ -12,8 +12,6 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import com.max2idea.android.qube.files.FileInstaller;
-import com.max2idea.android.qube.machine.OneOSGuestProvisioner;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -113,8 +111,6 @@ public final class MainActivity extends Activity {
         if (requestCode != PICK_ANDROID_GUEST || resultCode != RESULT_OK || data == null || data.getData() == null) return;
         status.setText("Preparing firmware and checking the Android guest archive...");
         OneOSLog.info("PICKER", "Selected archive URI=" + data.getData());
-        try { FileInstaller.installFiles(this, false); OneOSLog.info("FIRMWARE", "Bundled firmware setup completed."); }
-        catch (Throwable t) { OneOSLog.error("FIRMWARE", "Bundled firmware setup failed.", t); showStatus("Firmware setup failed. Open detailed logs."); return; }
         installGuestArchive(data.getData());
     }
 
@@ -207,12 +203,8 @@ public final class MainActivity extends Activity {
                 OneOSLog.info("VALIDATE", "QCOW2 headers and file sizes passed. vda=" + vda.length() + "; vdb=" + vdb.length() + " (small auxiliary disks allowed); efi_vars=" + vars.length());
                 deleteRecursively(installed);
                 if (!staging.renameTo(installed)) throw new IllegalStateException("Could not move staging directory to final guest location.");
-                OneOSLog.info("PROVISION", "Configuring ARM64 QEMU VM profile.");
-                OneOSGuestProvisioner.configure(new File(installed, "vda.qcow2").getAbsolutePath(),
-                        new File(installed, "vdb.qcow2").getAbsolutePath(),
-                        new File(installed, "efi_vars.fd").getAbsolutePath());
-                OneOSLog.info("SUCCESS", "Guest extraction, checksum, validation and VM provisioning completed.");
-                showStatus("Android 16 guest installed and VM configured. Open the VM manager and press Start.");
+                OneOSLog.info("SUCCESS", "Guest extraction, checksum and QCOW2 validation completed. QEMU will attach these files directly.");
+                showStatus("Android 16 guest imported. Open OneOS and press Start OS.");
             } catch (Throwable error) {
                 OneOSLog.error("INSTALL_FAILED", "seenEntries=" + seen + "; matchedEntries=" + matched + "; extractedBytes=" + total + "; foundVda=" + foundA + "; foundVdb=" + foundB + "; foundEfiVars=" + foundVars, error);
                 deleteRecursively(staging);
