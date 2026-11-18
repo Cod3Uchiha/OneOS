@@ -126,14 +126,14 @@ public final class OneOSVmActivity extends Activity {
             add(args, "-display", "vnc=127.0.0.1:0,websocket=5700");
             add(args, "-serial", "file:" + new File(guest, "serial.log").getAbsolutePath());
             add(args, "-monitor", "none");
-            add(args, "-no-reboot");
+            args.add("-no-reboot");
 
             ProcessBuilder builder = new ProcessBuilder(args);
             builder.directory(guest);
             builder.environment().put("LD_LIBRARY_PATH", getApplicationInfo().nativeLibraryDir + ":" + getFilesDir().getAbsolutePath());
             builder.redirectErrorStream(true);
             qemu = builder.start();
-            OneOSLog.info("QEMU_START", "Standalone QEMU launched. pid=" + qemu.pid() + "; storageGb=" + storageGb + "; command=" + args);
+            OneOSLog.info("QEMU_START", "Standalone QEMU launched; storageGb=" + storageGb + "; command=" + args);
             setStatus("Starting guest OS…");
             new Handler(Looper.getMainLooper()).postDelayed(() -> { if (display != null) display.reload(); }, 1800);
             final Process launched = qemu;
