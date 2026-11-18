@@ -8,7 +8,7 @@ The Android ARM64 QEMU runtime is built from upstream QEMU 11.1.2 using the Andr
 
 The QEMU executable is named `libqemu-system-aarch64.so` for Android's native-library packaging layout; it is launched as a process, not loaded as a Java JNI API. `libslirp.so` is a runtime dependency. The app uses QEMU TCG software emulation.
 
-The Android build packages AAVMF ARM64 UEFI code and a writable variable-store template, plus noVNC for local VNC display over a loopback-only WebSocket.
+The Android build packages AAVMF ARM64 UEFI code and a writable variable-store template, The app uses QEMU's QMP screendump command to capture the guest framebuffer and draws it in a native Android View. Touch and keyboard events are forwarded through QMP. No VNC server, noVNC client, WebView, or network display port is used.
 
 ## Import and disk setup
 
@@ -20,7 +20,7 @@ For UTM archives, OneOS preserves the auxiliary disk. It uses the bundled AAVMF 
 
 ## Boot and display
 
-Guests run on QEMU's ARM `virt` machine with UEFI, virtio storage, graphics, keyboard, mouse and networking. The local noVNC client connects to QEMU's VNC WebSocket on loopback only.
+Guests run on QEMU's ARM `virt` machine with UEFI, virtio storage, graphics, tablet, keyboard and networking. QEMU runs with `-display none` and exposes a private Unix-domain QMP socket inside app storage. OneOS captures PNG frames using QMP `screendump`, displays them in a native Android View, and forwards absolute touchscreen and keyboard events with `input-send-event`. This is a compatibility bridge rather than direct GPU/Surface passthrough; frame capture is expected to be slower than a native virtio-gpu renderer.
 
 ## Limits and validation
 
