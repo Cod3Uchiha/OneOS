@@ -1,32 +1,33 @@
-# QEMU ARM64 backend
+# OneOS standalone QEMU backend
 
-## Selected backend
+OneOS is moving to an app-owned QEMU backend. It does not use QubeVM, a VM-manager framework, root access, KVM, Termux, or host partition changes.
 
-OneOS uses the ARM64 guest build of [QubeVM](https://github.com/rhn-1k/QubeVM), pinned as a Git submodule at commit a45126697776e1efd4c8d72b94335e88590492ef (release 7.1.5). QubeVM packages QEMU 11.1.3 for Android ARM64 and supports aarch64-softmmu guests with TCG.
+## Runtime build
 
-The OneOS VM activity sets Config.enableKVM = false so a stock Android app never assumes access to /dev/kvm. It enables multi-threaded TCG. The backend is an actual system emulator, not a chroot, PRoot container or launcher.
+The Android ARM64 QEMU runtime is built from upstream QEMU 11.1.2 using the Android NDK. The current CI build recipe is pinned to ExTV/Podroid commit `e3fc1befa3c135d28bf8d40e3c2264d93fea87ef`, which contains an Android cross-compilation Dockerfile and its Bionic compatibility patches. The workflow extracts the QEMU system emulator, its SLIRP networking dependency, and qemu-img, then verifies that each executable is AArch64 before packaging.
 
-## Android 16 guest image
+The QEMU executable is named `libqemu-system-aarch64.so` for Android's native-library packaging layout; it is launched as a process, not loaded as a Java JNI API. `libslirp.so` is a runtime dependency. The app uses QEMU TCG software emulation.
 
-OneOS targets the ARM64-only LineageOS 24 virtual-device build from jqssun/android-lineage-qemu, release v2026.11.17. Its UTM archive contains two QCOW2 virtual disks and UEFI variable storage for a QEMU ARM virt machine.
+The OneOS build also packages ARM64 EDK2 UEFI firmware and noVNC for local VNC display over a loopback-only WebSocket.
 
-The app's installer verifies the release archive SHA-256:
+## Current guest format
 
-812c498d80130e4ae79d15311a9a16d0e0cc66fa11ff4dbd91c2f35df83dbdc9
+The existing importer accepts the LineageOS 24 ARM64 UTM ZIP published by jqssun's Android QEMU project. It verifies the archive SHA-256 and extracts:
 
-The guest archive is approximately 1.1 GB and is downloaded separately; it is not embedded in the APK. The installer extracts only vda.qcow2, vdb.qcow2 and efi_vars.fd, then provisions a two-vCPU, 2 GB ARM64 VM profile using TCG and virtio devices.
+- `vda.qcow2`: primary guest disk
+- `vdb.qcow2`: auxiliary guest disk
+- `efi_vars.fd`: guest UEFI variable store
 
-## Native runtime supply
+The guest is launched on QEMU's ARM `virt` machine with virtio storage, graphics, input and networking devices. The UEFI code image is packaged separately; the guest's writable variable store remains in app-private storage.
 
-The Android workflow downloads the upstream QubeVM ARM64 release APK from its 7.1.5 release, checks the published SHA-256:
+## Limits and validation
 
-ecb2e6ac3025a2a40572bd49a16c48df6d479eb4f092caec199df58328af7ae2
+- QEMU TCG is software CPU emulation. It may be slow on a phone compared with KVM.
+- The guest sees virtual ARM hardware, not the Snapdragon motherboard, Samsung vendor drivers, camera, modem or sensors.
+- The current UTM guest's first boot and display compatibility on the SCG14 are not yet verified.
+- Imported images must match the ARM64 architecture and the virtual devices/firmware configured by OneOS. Arbitrary images are not guaranteed to boot.
+- The app's current importer is still specialized for the Android 16 UTM bundle; generic ISO/raw/QCOW2 import and user-selected virtual disk capacity are follow-up work.
 
-It extracts the ARM64 native libraries into the OneOS APK and builds the OneOS Java app against the pinned QubeVM source module. The upstream GPL-3.0 license and source are retained.
+## Licensing and source
 
-## Limits
-
-- TCG is software emulation. It is rootless but can be much slower than KVM.
-- Stock Android's AVF APIs require restricted system permissions and are not assumed to be available to an ordinary installed app.
-- The QEMU ARM virt machine does not expose the phone's Adreno GPU or Samsung hardware devices.
-- Android guest first boot and SCG14 runtime compatibility are not yet validated. The app must not be represented as device-tested until that is done.
+QEMU is licensed under GPL-2.0. The Android cross-build recipe is sourced from [ExTV/Podroid](https://github.com/ExTV/Podroid), also GPL-2.0; its pinned Dockerfile and Android compatibility patches are used as a build input. The firmware and noVNC retain their upstream licenses and notices. Any distributed OneOS APK containing these components must be accompanied by the corresponding source and notices required by their licenses.
