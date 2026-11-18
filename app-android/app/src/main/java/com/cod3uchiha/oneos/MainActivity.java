@@ -194,10 +194,17 @@ public final class MainActivity extends Activity {
                     String missing = (!foundA ? "vda.qcow2 " : "") + (!foundB ? "vdb.qcow2 " : "") + (!foundVars ? "efi_vars.fd" : "");
                     throw new IllegalStateException("Missing " + missing + ". Scanned " + seen + " ZIP entries. Expected <bundle>.utm/Data/<file>. See ZIP_ENTRY log records.");
                 }
-                if (vda.length() < 1048576L || vdb.length() < 1048576L || vars.length() < 4096L) {
-                    throw new IllegalStateException("Extracted file size validation failed: vda=" + vda.length() + "; vdb=" + vdb.length() + "; efi_vars=" + vars.length());
+                // The upstream bundle intentionally includes a small auxiliary vdb disk.
+                // Do not impose an arbitrary 1 MiB minimum; validate the QCOW2 header.
+                if (vda.length() < 104L || vdb.length() < 104L || vars.length() < 4096L) {
+                    throw new IllegalStateException("Extracted file is empty or too small to contain its required header: vda=" + vda.length() + "; vdb=" + vdb.length() + "; efi_vars=" + vars.length());
                 }
-                OneOSLog.info("VALIDATE", "All files present and size checks passed. vda=" + vda.length() + "; vdb=" + vdb.length() + "; efi_vars=" + vars.length());
+                boolean vdaQcow2 = hasQcow2Header(vda);
+                boolean vdbQcow2 = hasQcow2Header(vdb);
+                if (!vdaQcow2 || !vdbQcow2) {
+                    throw new IllegalStateException("Disk format validation failed: expected QCOW2 magic QFI\\u001f\\u00fb. vdaHeaderValid=" + vdaQcow2 + "; vdbHeaderValid=" + vdbQcow2);
+                }
+                OneOSLog.info("VALIDATE", "QCOW2 headers and file sizes passed. vda=" + vda.length() + "; vdb=" + vdb.length() + " (small auxiliary disks allowed); efi_vars=" + vars.length());
                 deleteRecursively(installed);
                 if (!staging.renameTo(installed)) throw new IllegalStateException("Could not move staging directory to final guest location.");
                 OneOSLog.info("PROVISION", "Configuring ARM64 QEMU VM profile.");
@@ -241,6 +248,16 @@ public final class MainActivity extends Activity {
         } catch (Exception e) {
             OneOSLog.error("LOG_VIEWER", "Unable to display log file.", e);
             new AlertDialog.Builder(this).setTitle("Log viewer").setMessage(e.toString()).setPositiveButton("OK", null).show();
+        }
+    }
+
+    private static boolean hasQcow2Header(File file) {
+        if (file == null || !file.isFile() || file.length() < 4L) return false;
+        try (InputStream in = new FileInputStream(file)) {
+            return in.read() == 0x51 && in.read() == 0x46 && in.read() == 0x49 && in.read() == 0xfb;
+        } catch (Exception e) {
+            OneOSLog.error("DISK_HEADER", "Unable to read QCOW2 header for " + file, e);
+            return false;
         }
     }
 
