@@ -139,6 +139,7 @@ public final class MainActivity extends Activity {
                 extractArchive(uri, staging);
             } else {
                 String extension = extension(lower);
+                if (extension.isEmpty()) throw new IllegalArgumentException("Supported formats: QCOW2, IMG, RAW, ISO, or ZIP containing one of these images.");
                 File target = new File(staging, targetName(extension));
                 try (InputStream in = getContentResolver().openInputStream(uri)) {
                     if (in == null) throw new IllegalStateException("Could not open selected image.");
