@@ -64,13 +64,6 @@ jobs:
           test -s app-android/app/src/main/assets/firmware/UEFI_CODE.fd
           test -s app-android/app/src/main/assets/firmware/UEFI_VARS.fd
 
-      - name: Package noVNC display client
-        run: |
-          git clone --depth 1 --branch v1.5.0 https://github.com/novnc/noVNC.git /tmp/noVNC
-          mkdir -p app-android/app/src/main/assets/novnc
-          cp -a /tmp/noVNC/vnc.html /tmp/noVNC/app /tmp/noVNC/core /tmp/noVNC/vendor /tmp/noVNC/utils app-android/app/src/main/assets/novnc/
-          cp /tmp/noVNC/LICENSE.txt app-android/app/src/main/assets/novnc/LICENSE.txt
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
