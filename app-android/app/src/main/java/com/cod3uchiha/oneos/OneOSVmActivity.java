@@ -85,6 +85,8 @@ public final class OneOSVmActivity extends Activity {
 
             ensureVirtualDisk(qemuImg, osDisk, storageGb);
 
+            File qmpSocket = new File(guest, "qmp.sock");
+            if (qmpSocket.exists() && !qmpSocket.delete()) throw new IllegalStateException("Cannot clear the previous QMP socket.");
             List<String> args = new ArrayList<>();
             args.add(executable.getAbsolutePath());
             add(args, "-name", "OneOS");
@@ -115,7 +117,7 @@ public final class OneOSVmActivity extends Activity {
             add(args, "-netdev", "user,id=net0");
             add(args, "-device", "virtio-net-pci,netdev=net0");
             add(args, "-display", "none");
-            add(args, "-qmp", "unix:" + new File(guest, "qmp.sock").getAbsolutePath() + ",server=on,wait=off");
+            add(args, "-qmp", "unix:" + qmpSocket.getAbsolutePath() + ",server=on,wait=off");
             add(args, "-serial", "file:" + new File(guest, "serial.log").getAbsolutePath());
             add(args, "-monitor", "none");
             args.add("-no-reboot");
@@ -127,7 +129,7 @@ public final class OneOSVmActivity extends Activity {
             qemu = builder.start();
             OneOSLog.info("QEMU_START", "Standalone QEMU launched; storageGb=" + storageGb + "; command=" + args);
             setStatus("Starting guest OS…");
-            display.start(new File(guest, "qmp.sock"));
+            display.start(qmpSocket);
             final Process launched = qemu;
             new Thread(() -> {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(launched.getInputStream()))) {
