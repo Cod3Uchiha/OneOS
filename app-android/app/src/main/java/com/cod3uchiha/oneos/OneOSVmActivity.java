@@ -85,7 +85,10 @@ public final class OneOSVmActivity extends Activity {
             if (!executable.isFile() || !executable.canExecute()) throw new IllegalStateException("Standalone Android QEMU runtime is missing or not executable.");
             if (!slirp.isFile()) throw new IllegalStateException("QEMU networking library is missing.");
             if (!firmware.isFile()) copyAsset("firmware/UEFI_CODE.fd", firmware);
-            if (!vars.isFile()) copyAsset("firmware/UEFI_VARS.fd", vars);
+            if (!vars.isFile() || vars.length() != 64L * 1024L * 1024L) {
+                if (vars.isFile()) vars.renameTo(new File(guest, "imported_efi_vars.fd"));
+                copyAsset("firmware/UEFI_VARS.fd", vars);
+            }
             if (!qemuImg.isFile()) copyAsset("bin/qemu-img", qemuImg);
             if (!qemuImg.setExecutable(true, true) && !qemuImg.canExecute()) throw new IllegalStateException("Could not prepare qemu-img.");
 
@@ -104,7 +107,9 @@ public final class OneOSVmActivity extends Activity {
             add(args, "-drive", "if=none,id=osdisk,file=" + osDisk.getAbsolutePath() + ",format=" + (osDisk.getName().endsWith(".img") || osDisk.getName().endsWith(".raw") ? "raw" : "qcow2"));
             add(args, "-device", "virtio-blk-pci,drive=osdisk");
             if (iso.isFile()) {
-                add(args, "-drive", "file=" + iso.getAbsolutePath() + ",media=cdrom,readonly=on");
+                add(args, "-device", "virtio-scsi-pci,id=scsi0");
+                add(args, "-drive", "if=none,id=installmedia,file=" + iso.getAbsolutePath() + ",format=raw,media=cdrom,readonly=on");
+                add(args, "-device", "scsi-cd,drive=installmedia");
                 add(args, "-boot", "order=d");
             }
             File aux = new File(guest, "aux.qcow2");
