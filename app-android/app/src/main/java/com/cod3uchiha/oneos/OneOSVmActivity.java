@@ -88,8 +88,6 @@ public final class OneOSVmActivity extends Activity {
             if (!qemuImg.setExecutable(true, true) && !qemuImg.canExecute()) throw new IllegalStateException("Could not prepare qemu-img.");
 
             ensureVirtualDisk(qemuImg, osDisk, storageGb);
-            File dataDisk = new File(guest, "data.qcow2");
-            if (!osDisk.equals(dataDisk)) ensureVirtualDisk(qemuImg, dataDisk, storageGb);
 
             List<String> args = new ArrayList<>();
             args.add(executable.getAbsolutePath());
@@ -103,10 +101,7 @@ public final class OneOSVmActivity extends Activity {
             add(args, "-drive", "if=pflash,format=raw,unit=1,file=" + vars.getAbsolutePath());
             add(args, "-drive", "if=none,id=osdisk,file=" + osDisk.getAbsolutePath() + ",format=" + (osDisk.getName().endsWith(".img") || osDisk.getName().endsWith(".raw") ? "raw" : "qcow2"));
             add(args, "-device", "virtio-blk-pci,drive=osdisk");
-            if (!iso.isFile()) {
-                add(args, "-drive", "if=none,id=datadisk,file=" + dataDisk.getAbsolutePath() + ",format=qcow2");
-                add(args, "-device", "virtio-blk-pci,drive=datadisk");
-            } else {
+            if (iso.isFile()) {
                 add(args, "-drive", "file=" + iso.getAbsolutePath() + ",media=cdrom,readonly=on");
                 add(args, "-boot", "order=d");
             }
